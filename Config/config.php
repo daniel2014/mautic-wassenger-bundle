@@ -1,7 +1,7 @@
 <?php
 
 /*
- * @copyright   2018 Mautic Contributors. All rights reserved
+ * @copyright   2019 Mautic Contributors. All rights reserved
  * @author      Mautic
  *
  * @link        http://mautic.org
@@ -26,6 +26,7 @@ return [
                     'mautic.page.model.trackable',
                     'mautic.helper.integration',
                     'monolog.logger.mautic',
+                    'mautic.http.connector'
                 ],
                 'alias' => 'mautic.sms.config.transport.wassenger',
                 'tag'          => 'mautic.sms_transport',
