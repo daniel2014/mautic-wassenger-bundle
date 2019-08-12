@@ -1,6 +1,6 @@
 <?php
 /*
- * @copyright   2018 Mautic Contributors. All rights reserved
+ * @copyright   2019 Mautic Contributors. All rights reserved
  * @author      Mautic
  *
  * @link        http://mautic.org
@@ -11,9 +11,7 @@
 
 namespace MauticPlugin\MauticWassengerBundle\Wassenger;
 
-use http\Client;
-use http\Client\Request;
-use http\Message\Body;
+use Joomla\Http\Http;
 use Mautic\LeadBundle\Entity\Lead;
 use Mautic\PageBundle\Model\TrackableModel;
 use Mautic\PluginBundle\Helper\IntegrationHelper;
@@ -22,10 +20,6 @@ use Monolog\Logger;
 
 class WassengerApi extends AbstractSmsApi
 {
-    /**
-     * @var Client
-     */
-    protected $client;
 
     /**
      * @var Logger
@@ -51,15 +45,19 @@ class WassengerApi extends AbstractSmsApi
      * MessageBirdApi constructor.
      *
      * @param TrackableModel    $pageTrackableModel
-     * @param PhoneNumberHelper $phoneNumberHelper
      * @param IntegrationHelper $integrationHelper
      * @param Logger            $logger
+     * @param Http|null         $http
      */
-    public function __construct(TrackableModel $pageTrackableModel, IntegrationHelper $integrationHelper, Logger $logger)
-    {
-        $this->logger = $logger;
+    public function __construct(
+        TrackableModel $pageTrackableModel,
+        IntegrationHelper $integrationHelper,
+        Logger $logger,
+        Http $http = null
+    ) {
+        $this->logger            = $logger;
         $this->integrationHelper = $integrationHelper;
-        $this->client = new Client();
+        $this->http              = $http;
         parent::__construct($pageTrackableModel);
     }
 
@@ -77,30 +75,24 @@ class WassengerApi extends AbstractSmsApi
 
         $integration = $this->integrationHelper->getIntegrationObject('Wassenger');
         if ($integration && $integration->getIntegrationSettings()->getIsPublished()) {
-            $data   = $integration->getDecryptedApiKeys();
-
-            $request = new Request();
-            $body = new Body();
-
-            $body->append('{"phone":"'.$contact->getMobile().'","message":"'.$content.'"}');
-
-            $request->setRequestUrl('https://api.wassenger.com/v1/messages');
-            $request->setRequestMethod('POST');
-            $request->setBody($body);
-
-            $request->setHeaders(array(
-                'token' => $data['AUTH_TOKEN'],
-                'content-type' => 'application/json'
-            ));
-
-            $this->client->enqueue($request)->send();
-            $response = $this->client->getResponse();
-
-            if ($response->getBody()) {
+            $data              = $integration->getDecryptedApiKeys();
+            $input             = [];
+            $input['reference'] = $contact->getId();
+            $input['phone']   = $contact->getMobile();
+            $input['message'] = $content;
+            $headers           = [
+                'token'        => $data['AUTH_TOKEN'],
+                'content-type' => 'application/json',
+            ];
+            $response          = $this->http->post('https://api.wassenger.com/v1/messages', json_encode($input), $headers);
+            $body = json_decode($response->body, true);
+            print_r($body);
+            if ($response->code=== 201) {
                 return true;
-            }else{
-                return false;
+            } elseif(isset($body['message'])) {
+                return $body['message'];
             }
+            return false;
         }
     }
 }
